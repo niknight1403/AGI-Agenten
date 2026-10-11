@@ -1,0 +1,5 @@
+{
+  "name": "agi-agenten",
+  "private": true,
+  "scripts": { "test": "./venv/bin/python -m pytest tests/ -q" }
+}
