@@ -1,0 +1,19 @@
+{
+  "ts": "2026-10-11T15:15:04.075Z",
+  "villa": {
+    "id": 1,
+    "name": "AGI Agenten Villa",
+    "status": "PAUSED"
+  },
+  "tasks": {
+    "FAILED": 18,
+    "PENDING": 1
+  },
+  "running": false,
+  "patches": {
+    "appliedThisCycle": [],
+    "failedThisCycle": [],
+    "pendingArtefacts": 0
+  },
+  "lastTestResult": "n/a"
+}
