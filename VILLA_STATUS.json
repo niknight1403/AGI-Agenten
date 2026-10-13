@@ -1,14 +1,13 @@
 {
-  "ts": "2026-10-13T10:01:51.215Z",
+  "ts": "2026-10-13T10:11:51.223Z",
   "villa": {
     "id": 1,
     "name": "AGI Agenten Villa",
     "status": "RUNNING"
   },
   "tasks": {
-    "DONE": 651,
+    "DONE": 655,
     "IN_PROGRESS": 1,
-    "PENDING": 1,
     "RUNNING": 2
   },
   "running": true,
