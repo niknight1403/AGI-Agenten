@@ -1,5 +1,5 @@
 {
-  "ts": "2026-10-14T20:10:44.421Z",
+  "ts": "2026-10-14T20:20:46.478Z",
   "villa": {
     "id": 1,
     "name": "AGI Agenten Villa",
@@ -10,7 +10,7 @@
     "RUNNING": 1,
     "DONE": 300
   },
-  "running": true,
+  "running": false,
   "patches": {
     "appliedThisCycle": [],
     "failedThisCycle": [],
