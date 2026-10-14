@@ -1,4 +1,20 @@
 {
-  "ts": "2026-10-14T16:22:09.275Z",
-  "error": "TypeError: fetch failed"
+  "ts": "2026-10-14T16:28:19.342Z",
+  "villa": {
+    "id": 1,
+    "name": "AGI Agenten Villa",
+    "status": "RUNNING"
+  },
+  "tasks": {
+    "DONE": 929,
+    "IN_PROGRESS": 1,
+    "RUNNING": 1
+  },
+  "running": true,
+  "patches": {
+    "appliedThisCycle": [],
+    "failedThisCycle": [],
+    "pendingArtefacts": 0
+  },
+  "lastTestResult": "n/a"
 }
