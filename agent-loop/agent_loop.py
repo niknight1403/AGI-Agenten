@@ -1,5 +1,7 @@
 """AGI-Agenten Loop-Engine: Plan -> Execute -> Evaluate -> Optimize."""
 import argparse
+from contextlib import asynccontextmanager
+import fcntl
 import asyncio
 import json
 import logging
@@ -106,21 +108,38 @@ class AgentLoopEngine:
         logger.info("Optimierung: strategy=%s", applied["strategy"])
         return {"suggestion": suggestion, "applied": applied}
 
+    @asynccontextmanager
+    async def _state_lock(self):
+        """Serialise read/modify/write across processes on POSIX local filesystems."""
+        lock_path = os.path.abspath(self.state_file) + ".lock"
+        with open(lock_path, "a+b") as lock_file:
+            await asyncio.to_thread(fcntl.flock, lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
     async def run_cycle(self) -> Dict[str, Any]:
-        cycle = self.state["cycle"]
-        plan = await self.run_plan_phase()
-        execution = await self.run_execution_phase(plan)
-        evaluation = await self.run_evaluation_phase(execution)
-        entry = {"cycle": cycle, "score": evaluation["score"],
-                 "passed": evaluation["passed"], "ts": time.time(),
-                 "provider": plan["provider"],
-                 "offline_fallback": plan["offline_fallback"]}
-        self.state["history"].append(entry)
-        optimization = await self.run_optimization_phase()
-        self.state["cycle"] = cycle + 1
-        self._save_state()
-        return {"cycle": cycle, **plan, "evaluation": evaluation,
-                "optimization": optimization["applied"]}
+        async with self._state_lock():
+            # Reload UNDER the lock to prevent stale-instance lost updates.
+            self.state = self._load_state()
+            cycle = self.state["cycle"]
+            plan = await self.run_plan_phase()
+            execution = await self.run_execution_phase(plan)
+            evaluation = await self.run_evaluation_phase(execution)
+            if plan["offline_fallback"]:
+                evaluation["passed"] = False
+                evaluation["reasons"].append("Offline placeholder is not verified inference")
+            entry = {"cycle": cycle, "score": evaluation["score"],
+                     "passed": evaluation["passed"], "ts": time.time(),
+                     "provider": plan["provider"],
+                     "offline_fallback": plan["offline_fallback"]}
+            self.state["history"].append(entry)
+            optimization = await self.run_optimization_phase()
+            self.state["cycle"] = cycle + 1
+            self._save_state()
+            return {"cycle": cycle, **plan, "evaluation": evaluation,
+                    "optimization": optimization["applied"]}
 
     async def run(self, cycles: int = 1) -> Dict[str, Any]:
         if not isinstance(cycles, int) or cycles < 1:
