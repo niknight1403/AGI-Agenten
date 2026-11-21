@@ -5,6 +5,7 @@ import fcntl
 import asyncio
 import json
 import logging
+import math
 import os
 import sys
 import tempfile
@@ -54,6 +55,11 @@ class AgentLoopEngine:
             if (not isinstance(data, dict) or type(data.get("cycle")) is not int
                     or data["cycle"] < 1 or not isinstance(data.get("history"), list)):
                 raise ValueError("Invalid AGI state file schema")
+            if any(not isinstance(entry, dict)
+                   or type(entry.get("score")) not in (int, float)
+                   or not math.isfinite(entry["score"])
+                   for entry in data["history"]):
+                raise ValueError("Invalid AGI state history score")
             return data
         return {"cycle": 1, "history": []}
 

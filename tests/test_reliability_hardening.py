@@ -76,6 +76,15 @@ def test_invalid_state_rejected(tmp_path):
         AgentLoopEngine(state_file=str(path))
 
 
+@pytest.mark.parametrize("entry", [None, {}, {"score": "bad"},
+                                       {"score": True}, {"score": float("nan")}])
+def test_invalid_history_rejected_at_load(tmp_path, entry):
+    path = tmp_path / "bad-history.json"
+    path.write_text(json.dumps({"cycle": 2, "history": [entry]}))
+    with pytest.raises(ValueError, match="history score"):
+        AgentLoopEngine(state_file=str(path))
+
+
 def test_invalid_cycles_rejected(tmp_path):
     engine = AgentLoopEngine(state_file=str(tmp_path / "state.json"))
     with pytest.raises(ValueError):
