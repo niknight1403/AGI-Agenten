@@ -80,3 +80,18 @@ def test_invalid_cycles_rejected(tmp_path):
     engine = AgentLoopEngine(state_file=str(tmp_path / "state.json"))
     with pytest.raises(ValueError):
         asyncio.run(engine.run(0))
+
+
+def test_restart_restores_prompt_strategy_before_planning(tmp_path, monkeypatch):
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps({"cycle": 2, "history": [{"cycle": 1, "score": 0.2}]}))
+    engine = AgentLoopEngine(state_file=str(path))
+    prompts = []
+
+    async def hypothesis(payload):
+        prompts.append(payload["prompt"])
+        return {"response": "hypothese agi", "provider": "test", "fallback": False}
+
+    monkeypatch.setattr(engine.free_llm, "process", hypothesis)
+    asyncio.run(engine.run_cycle())
+    assert "Nutze klare Metriken" in prompts[0]

@@ -132,6 +132,9 @@ class AgentLoopEngine:
         async with self._state_lock():
             # Reload UNDER the lock to prevent stale-instance lost updates.
             self.state = self._load_state()
+            if self.state["history"]:
+                self.self_optimization.apply(
+                    self.self_optimization.analyze(self.state["history"]))
             cycle = self.state["cycle"]
             plan = await self.run_plan_phase()
             execution = await self.run_execution_phase(plan)
