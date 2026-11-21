@@ -4,6 +4,7 @@ import json
 import multiprocessing
 import os
 import sys
+import fcntl
 
 import pytest
 
@@ -43,6 +44,28 @@ def test_async_concurrent_instances_preserve_all_cycles(tmp_path, monkeypatch):
     assert sorted(result["cycle"] for result in results) == [1, 2, 3]
     assert data["cycle"] == 4
     assert len(data["history"]) == 3
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX flock only")
+def test_cancelled_lock_waiter_releases_late_acquisition(tmp_path):
+    path = str(tmp_path / "state.json")
+    lock_path = path + ".lock"
+
+    async def run():
+        with open(lock_path, "a+b") as holder:
+            fcntl.flock(holder.fileno(), fcntl.LOCK_EX)
+            waiter = asyncio.create_task(AgentLoopEngine(state_file=path).run_cycle())
+            await asyncio.sleep(0.05)
+            waiter.cancel()
+            fcntl.flock(holder.fileno(), fcntl.LOCK_UN)
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(waiter, timeout=3)
+        # A cancelled waiter must not leave the lock held by its worker thread.
+        async with asyncio.timeout(3):
+            async with AgentLoopEngine(state_file=path)._state_lock():
+                pass
+
+    asyncio.run(run())
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX flock only")

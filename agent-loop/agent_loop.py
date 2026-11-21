@@ -113,7 +113,16 @@ class AgentLoopEngine:
         """Serialise read/modify/write across processes on POSIX local filesystems."""
         lock_path = os.path.abspath(self.state_file) + ".lock"
         with open(lock_path, "a+b") as lock_file:
-            await asyncio.to_thread(fcntl.flock, lock_file.fileno(), fcntl.LOCK_EX)
+            acquisition = asyncio.create_task(
+                asyncio.to_thread(fcntl.flock, lock_file.fileno(), fcntl.LOCK_EX))
+            try:
+                await asyncio.shield(acquisition)
+            except asyncio.CancelledError:
+                # A thread waiting in flock cannot be cancelled. Keep its file
+                # descriptor alive until it acquires the lock, then release it.
+                await asyncio.shield(acquisition)
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                raise
             try:
                 yield
             finally:
