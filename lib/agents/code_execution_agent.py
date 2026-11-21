@@ -50,6 +50,10 @@ class CodeExecutionAgent(BaseAgent):
                 proc.kill()
                 await proc.communicate()
                 return {"success": False, "stdout": "", "stderr": "Timeout"}
+            except asyncio.CancelledError:
+                proc.kill()
+                await proc.communicate()
+                raise
             return {"success": proc.returncode == 0, "stdout": stdout.decode(errors="replace")[:65536], "stderr": stderr.decode(errors="replace")[:65536]}
     async def process(self, payload):
         return await self.execute(payload.get("code", ""), payload.get("timeout", 3))
