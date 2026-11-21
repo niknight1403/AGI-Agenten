@@ -44,3 +44,21 @@ def test_handler_missing(config):
     mcp.load(config)
     out = asyncio.run(mcp.call_tool("echo", {"x": 1}))
     assert not out["ok"] and "kein Handler" in out["error"]
+
+
+def test_invalid_reload_clears_previous_tools(config, tmp_path):
+    mcp = MCPConnectorAgent()
+    assert mcp.load(config)["ok"]
+    mcp.register_handler("calc", lambda args: 42)
+    malformed = tmp_path / "invalid.json"
+    malformed.write_text("[]", encoding="utf-8")
+    assert not mcp.load(malformed)["ok"]
+    result = asyncio.run(mcp.call_tool("calc"))
+    assert not result["ok"] and result["error"] == "unbekanntes Tool"
+
+
+def test_missing_reload_clears_previous_tools(config, tmp_path):
+    mcp = MCPConnectorAgent()
+    assert mcp.load(config)["ok"]
+    assert not mcp.load(tmp_path / "missing.json")["ok"]
+    assert mcp.tools == {}

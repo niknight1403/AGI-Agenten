@@ -7,10 +7,11 @@ class MCPConnectorAgent(BaseAgent):
         self.tools = {}
         self.handlers = {}
     def load(self, path):
+        self.tools = {}
         try:
             with open(path, encoding="utf-8") as handle:
                 cfg = json.load(handle)
-            if not isinstance(cfg.get("tools"), dict):
+            if not isinstance(cfg, dict) or not isinstance(cfg.get("tools"), dict):
                 return {"ok": False, "error": "Ungueltige Tool-Konfiguration"}
             self.tools = cfg["tools"]
             return {"ok": True, "loaded": len(self.tools), "tools": list(self.tools)}
