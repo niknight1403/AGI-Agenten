@@ -57,9 +57,9 @@ def test_cancelled_lock_waiter_releases_late_acquisition(tmp_path):
             waiter = asyncio.create_task(AgentLoopEngine(state_file=path).run_cycle())
             await asyncio.sleep(0.05)
             waiter.cancel()
-            fcntl.flock(holder.fileno(), fcntl.LOCK_UN)
             with pytest.raises(asyncio.CancelledError):
-                await asyncio.wait_for(waiter, timeout=3)
+                await asyncio.wait_for(waiter, timeout=1)
+            fcntl.flock(holder.fileno(), fcntl.LOCK_UN)
         # A cancelled waiter must not leave the lock held by its worker thread.
         async with asyncio.timeout(3):
             async with AgentLoopEngine(state_file=path)._state_lock():
