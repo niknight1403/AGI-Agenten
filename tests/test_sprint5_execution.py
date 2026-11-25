@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-from lib.agents.code_execution_agent import CodeExecutionAgent
+from lib.agents.code_execution_agent import CodeExecutionAgent, MAX_OUTPUT_BYTES
 
 
 def test_simple_execution():
@@ -26,6 +26,22 @@ def test_runtime_error_reports_stderr():
 def test_timeout_kills_runaway_code():
     out = asyncio.run(CodeExecutionAgent().execute("while True: pass", timeout=1))
     assert not out["success"] and "Timeout" in out["stderr"]
+
+
+def test_stdout_limit_terminates_runaway_output():
+    code = 'print("x" * 70000)'
+    out = asyncio.run(CodeExecutionAgent().execute(code, timeout=5))
+    assert not out["success"]
+    assert len(out["stdout"].encode()) <= MAX_OUTPUT_BYTES
+    assert "Output limit exceeded" in out["stderr"]
+
+
+def test_stderr_is_bounded_during_capture():
+    code = 'raise ValueError("x" * 70000)'
+    out = asyncio.run(CodeExecutionAgent().execute(code, timeout=5))
+    assert not out["success"]
+    assert out["stdout"] == ""
+    assert "Output limit exceeded" in out["stderr"]
 
 
 def test_cancellation_reaps_child_process(monkeypatch):

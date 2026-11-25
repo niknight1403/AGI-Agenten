@@ -55,11 +55,30 @@ class AgentLoopEngine:
             if (not isinstance(data, dict) or type(data.get("cycle")) is not int
                     or data["cycle"] < 1 or not isinstance(data.get("history"), list)):
                 raise ValueError("Invalid AGI state file schema")
-            if any(not isinstance(entry, dict)
-                   or type(entry.get("score")) not in (int, float)
-                   or not math.isfinite(entry["score"])
-                   for entry in data["history"]):
-                raise ValueError("Invalid AGI state history score")
+            previous_cycle = 0
+            for entry in data["history"]:
+                if (not isinstance(entry, dict)
+                        or type(entry.get("score")) not in (int, float)
+                        or not math.isfinite(entry["score"])
+                        or not 0 <= entry["score"] <= 1):
+                    raise ValueError("Invalid AGI state history score")
+                # Earlier schema versions allowed sparse entries; validate optional
+                # metadata when present, while retaining that on-disk compatibility.
+                cycle = entry.get("cycle")
+                if cycle is not None:
+                    if type(cycle) is not int or cycle <= previous_cycle or cycle >= data["cycle"]:
+                        raise ValueError("Invalid AGI state history cycle")
+                    previous_cycle = cycle
+                timestamp = entry.get("ts")
+                if timestamp is not None and (
+                        type(timestamp) not in (int, float) or not math.isfinite(timestamp)):
+                    raise ValueError("Invalid AGI state history timestamp")
+                if "passed" in entry and type(entry["passed"]) is not bool:
+                    raise ValueError("Invalid AGI state history passed flag")
+                if "offline_fallback" in entry and type(entry["offline_fallback"]) is not bool:
+                    raise ValueError("Invalid AGI state history fallback flag")
+                if "provider" in entry and not isinstance(entry["provider"], str):
+                    raise ValueError("Invalid AGI state history provider")
             return data
         return {"cycle": 1, "history": []}
 
@@ -68,10 +87,16 @@ class AgentLoopEngine:
         fd, temporary = tempfile.mkstemp(prefix=".agi-state-", suffix=".json", dir=directory)
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(self.state, f, indent=2, ensure_ascii=False)
+                json.dump(self.state, f, indent=2, ensure_ascii=False, allow_nan=False)
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(temporary, self.state_file)
+            # Persist the rename itself where directory fsync is supported.
+            directory_fd = os.open(directory, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
         finally:
             if os.path.exists(temporary):
                 os.unlink(temporary)

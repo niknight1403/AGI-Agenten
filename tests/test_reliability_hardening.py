@@ -104,3 +104,36 @@ def test_restart_restores_prompt_strategy_before_planning(tmp_path, monkeypatch)
     monkeypatch.setattr(engine.free_llm, "process", hypothesis)
     asyncio.run(engine.run_cycle())
     assert "Nutze klare Metriken" in prompts[0]
+
+
+@pytest.mark.parametrize("entry, message", [
+    ({"score": -0.01}, "history score"),
+    ({"score": 1.01}, "history score"),
+    ({"score": 0.5, "cycle": 0}, "history cycle"),
+    ({"score": 0.5, "cycle": 2}, "history cycle"),
+    ({"score": 0.5, "cycle": 1, "ts": float("inf")}, "history timestamp"),
+    ({"score": 0.5, "passed": 1}, "history passed flag"),
+    ({"score": 0.5, "offline_fallback": "false"}, "history fallback flag"),
+    ({"score": 0.5, "provider": None}, "history provider"),
+])
+def test_invalid_history_metadata_rejected(tmp_path, entry, message):
+    path = tmp_path / "bad-metadata.json"
+    path.write_text(json.dumps({"cycle": 2, "history": [entry]}))
+    with pytest.raises(ValueError, match=message):
+        AgentLoopEngine(state_file=str(path))
+
+
+def test_sparse_legacy_history_remains_supported(tmp_path):
+    path = tmp_path / "legacy.json"
+    path.write_text(json.dumps({"cycle": 2, "history": [{"cycle": 1, "score": 0.2}]}))
+    assert AgentLoopEngine(state_file=str(path)).state["history"][0]["score"] == 0.2
+
+
+def test_save_rejects_non_finite_json_and_cleans_temp_file(tmp_path):
+    path = tmp_path / "state.json"
+    engine = AgentLoopEngine(state_file=str(path))
+    engine.state["history"].append({"score": float("nan")})
+    with pytest.raises(ValueError):
+        engine._save_state()
+    assert not path.exists()
+    assert not list(tmp_path.glob(".agi-state-*.json"))
